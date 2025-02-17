@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Activity Progress Tracker</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body class="bg-slate-100 min-h-screen font-['Inter']">
+    <div class="container mx-auto px-4 py-8 max-w-3xl">
+        <h1 class="text-3xl font-bold text-slate-800 mb-8">Activity Progress Tracker</h1>
+        
+        <!-- Add Activity Form -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-8">
+            <form id="activityForm" class="flex flex-col md:flex-row gap-4">
+                <input type="text" id="activityInput" placeholder="Enter new activity" 
+                       class="flex-grow px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <button type="submit" 
+                        class="bg-blue-500 text-white px-6 py-2 rounded-md hover:bg-blue-600 transition-colors">
+                    Add Activity
+                </button>
+            </form>
+        </div>
+
+        <!-- Activities List -->
+        <div id="activitiesList" class="space-y-4"></div>
+    </div>
+
+    <script>
+        class Activity {
+            constructor(name) {
+                this.name = name;
+                this.logs = [];
+                this.id = Date.now().toString();
+            }
+
+            toggleToday() {
+                const today = new Date().toDateString();
+                const existingLog = this.logs.find(log => new Date(log.date).toDateString() === today);
+                
+                if (existingLog) {
+                    this.logs = this.logs.filter(log => new Date(log.date).toDateString() !== today);
+                } else {
+                    this.logs.push({ date: new Date(), completed: true });
+                }
+            }
+
+            getProgress() {
+                const last7Days = [...Array(7)].map((_, i) => {
+                    const date = new Date();
+                    date.setDate(date.getDate() - i);
+                    return date.toDateString();
+                });
+
+                const completedDays = this.logs.filter(log => 
+                    last7Days.includes(new Date(log.date).toDateString())
+                ).length;
+
+                return (completedDays / 7) * 100;
+            }
+        }
+
+        class ActivityTracker {
+            constructor() {
+                this.activities = JSON.parse(localStorage.getItem('activities')) || [];
+                this.activities = this.activities.map(activity => {
+                    const newActivity = new Activity(activity.name);
+                    newActivity.logs = activity.logs;
+                    newActivity.id = activity.id;
+                    return newActivity;
+                });
+                this.render();
+            }
+
+            addActivity(name) {
+                const activity = new Activity(name);
+                this.activities.push(activity);
+                this.saveToStorage();
+                this.render();
+            }
+
+            removeActivity(id) {
+                this.activities = this.activities.filter(activity => activity.id !== id);
+                this.saveToStorage();
+                this.render();
+            }
+
+            toggleActivity(id) {
+                const activity = this.activities.find(a => a.id === id);
+                if (activity) {
+                    activity.toggleToday();
+                    this.saveToStorage();
+                    this.render();
+                }
+            }
+
+            saveToStorage() {
+                localStorage.setItem('activities', JSON.stringify(this.activities));
+            }
+
+            render() {
+                const container = document.getElementById('activitiesList');
+                container.innerHTML = '';
+
+                this.activities.forEach(activity => {
+                    const progress = activity.getProgress();
+                    const isCompletedToday = activity.logs.some(log => 
+                        new Date(log.date).toDateString() === new Date().toDateString()
+                    );
+
+                    const element = document.createElement('div');
+                    element.className = 'bg-white rounded-lg shadow-md p-6';
+                    element.innerHTML = `
+                        <div class="flex items-center justify-between flex-wrap gap-4">
+                            <div class="flex items-center gap-4 flex-grow">
+                                <input type="checkbox" 
+                                       ${isCompletedToday ? 'checked' : ''} 
+                                       class="w-6 h-6 rounded border-gray-300 text-blue-500 focus:ring-blue-500"
+                                       onclick="tracker.toggleActivity('${activity.id}')">
+                                <h3 class="text-lg font-semibold text-slate-800">${activity.name}</h3>
+                            </div>
+                            <button onclick="tracker.removeActivity('${activity.id}')"
+                                    class="text-red-500 hover:text-red-600">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </div>
+                        <div class="mt-4">
+                            <div class="flex justify-between mb-1">
+                                <span class="text-sm text-slate-600">7-day progress</span>
+                                <span class="text-sm text-slate-600">${Math.round(progress)}%</span>
+                            </div>
+                            <div class="w-full bg-slate-200 rounded-full h-2.5">
+                                <div class="bg-blue-500 h-2.5 rounded-full transition-all duration-500" 
+                                     style="width: ${progress}%"></div>
+                            </div>
+                        </div>
+                    `;
+                    container.appendChild(element);
+                });
+            }
+        }
+
+        const tracker = new ActivityTracker();
+
+        document.getElementById('activityForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const input = document.getElementById('activityInput');
+            const activityName = input.value.trim();
+            
+            if (activityName) {
+                tracker.addActivity(activityName);
+                input.value = '';
+            }
+        });
+    </script>
+<script>document.body.addEventListener('wheel', e => { if (!e.ctrlKey) return; e.preventDefault(); return }, { passive: false })</script>
+	</body>
+</html>
